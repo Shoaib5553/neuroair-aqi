@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroAir | Live AI Forecast</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Space Grotesk"', 'sans-serif'] },
+                    colors: { dark: "#050505", neon: "#00f3ff" }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #050505; color: white; background-image: radial-gradient(circle at 50% 0%, rgba(0, 243, 255, 0.1), transparent 40%); }
+        select {
+            -webkit-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg fill='white' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 1rem center; background-size: 1.5em;
+        }
+        .glass-card { background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <main class="w-full max-w-5xl">
+        <header class="flex justify-between items-end mb-10 border-b border-white/10 pb-6">
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <div id="statusDot" class="w-2 h-2 rounded-full bg-red-500"></div>
+                    <span id="statusText" class="text-xs font-mono text-gray-400 tracking-widest uppercase">Connecting...</span>
+                </div>
+                <h1 class="text-5xl font-bold text-white">Neuro<span class="text-neon">Air</span></h1>
+            </div>
+        </header>
+
+        <section class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+            <div class="md:col-span-8 glass-card rounded-2xl p-8">
+                <label class="text-gray-400 text-sm uppercase tracking-wider font-semibold mb-4 block">Select City</label>
+                <div class="flex gap-4">
+                    <div class="relative w-full">
+                        <select id="citySelect" class="w-full bg-black/40 border border-white/20 text-white text-xl rounded-xl px-6 py-4 outline-none focus:border-neon transition-colors">
+                            <option value="" disabled selected>Choose location...</option>
+                            <option value="Delhi">Delhi</option>
+                            <option value="Mumbai">Mumbai</option>
+                            <option value="Bangalore">Bangalore</option>
+                            <option value="Chennai">Chennai</option>
+                            <option value="Kolkata">Kolkata</option>
+                        </select>
+                    </div>
+                    <button onclick="runAnalysis()" class="bg-neon text-black px-8 rounded-xl font-bold text-lg hover:bg-white transition-all flex items-center justify-center">
+                        <i class="fa-solid fa-bolt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="md:col-span-4 glass-card rounded-2xl p-8 flex flex-col justify-center">
+                <p class="text-gray-400 text-sm">Data Source</p>
+                <p class="text-xl font-semibold text-white">Open-Meteo API</p>
+                <p class="text-xs text-green-400 mt-1">● Live Satellite Data</p>
+            </div>
+        </section>
+
+        <div id="results" class="hidden opacity-0 transition-opacity duration-700">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                <div class="glass-card rounded-3xl p-10 text-center flex flex-col justify-center items-center border-t-4 border-neon shadow-lg shadow-neon/10">
+                    <p class="text-gray-400 font-mono text-sm uppercase tracking-widest mb-2">Today's Index</p>
+                    <h2 id="aqiBig" class="text-9xl font-bold text-white my-4 tracking-tighter">--</h2>
+                    <span id="aqiText" class="px-6 py-2 rounded-full bg-white/10 text-white font-bold text-lg border border-white/10">--</span>
+                </div>
+
+                <div class="glass-card rounded-3xl p-10 text-center flex flex-col justify-center items-center border-t-4 border-purple-500 shadow-lg shadow-purple-500/10">
+                    <p class="text-gray-400 font-mono text-sm uppercase tracking-widest mb-2">Tomorrow (<span id="tomDate">--</span>)</p>
+                    <h2 id="tomAqiBig" class="text-9xl font-bold text-white my-4 tracking-tighter">--</h2>
+                    <span id="tomAqiText" class="px-6 py-2 rounded-full bg-white/10 text-white font-bold text-lg border border-white/10">--</span>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function checkHealth() {
+            try {
+                const res = await fetch('/health');
+                if(res.ok) {
+                    document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-neon animate-pulse";
+                    document.getElementById('statusText').innerText = "SYSTEM ONLINE";
+                    document.getElementById('statusText').className = "text-xs font-mono text-neon tracking-widest uppercase";
+                }
+            } catch(e) {}
+        }
+        setInterval(checkHealth, 5000);
+        checkHealth();
+
+        function getColor(aqi) {
+            if(aqi <= 50) return "#4ade80"; // Green
+            if(aqi <= 100) return "#facc15"; // Yellow
+            if(aqi <= 200) return "#fb923c"; // Orange
+            if(aqi <= 300) return "#ef4444"; // Red
+            if(aqi <= 400) return "#a855f7"; // Purple
+            return "#be123c"; // Dark Red/Maroon
+        }
+
+        async function runAnalysis() {
+            const city = document.getElementById('citySelect').value;
+            if(!city) return alert("Select a city!");
+
+            const btn = document.querySelector('button');
+            const icon = btn.querySelector('i');
+            icon.className = "fa-solid fa-circle-notch fa-spin";
+            btn.disabled = true;
+            btn.style.opacity = "0.7";
+
+            try {
+                const formData = new FormData();
+                formData.append('city', city);
+                const response = await fetch('/predict', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if(data.error) throw new Error(data.error);
+
+                document.getElementById('results').classList.remove('hidden');
+                setTimeout(() => document.getElementById('results').classList.remove('opacity-0'), 100);
+
+                // --- UPDATE CURRENT CARD ---
+                document.getElementById('aqiBig').innerText = data.current_aqi;
+                const statusEl = document.getElementById('aqiText');
+                statusEl.innerText = data.current_status;
+
+                const curColor = getColor(data.current_aqi);
+                statusEl.style.color = curColor;
+                statusEl.style.borderColor = curColor;
+                statusEl.style.backgroundColor = curColor + "10";
+                // Glow effect on number
+                document.getElementById('aqiBig').style.textShadow = `0 0 30px ${curColor}40`;
+
+
+                // --- UPDATE TOMORROW CARD ---
+                document.getElementById('tomDate').innerText = data.tomorrow_date;
+                document.getElementById('tomAqiBig').innerText = data.tomorrow_aqi;
+                const tomStatusEl = document.getElementById('tomAqiText');
+                tomStatusEl.innerText = data.tomorrow_status;
+
+                const tomColor = getColor(data.tomorrow_aqi);
+                tomStatusEl.style.color = tomColor;
+                tomStatusEl.style.borderColor = tomColor;
+                tomStatusEl.style.backgroundColor = tomColor + "10";
+                // Glow effect on number
+                document.getElementById('tomAqiBig').style.textShadow = `0 0 30px ${tomColor}40`;
+
+            } catch(err) {
+                alert("Error: " + err.message);
+            } finally {
+                icon.className = "fa-solid fa-bolt";
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+        }
+    </script>
+</body>
+</html>
